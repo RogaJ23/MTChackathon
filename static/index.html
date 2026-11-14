@@ -4,61 +4,87 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Climate Twin Crop Advisor</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:ital,wght@0,500;1,500&display=swap">
 <style>
-  :root { --ink:#1c2420; --muted:#5d6a63; --line:#dfe5df; --bg:#f6f7f3; --card:#fff; --accent:#1f6f4a; --warn:#a4501a; }
+  :root { --ink:#f3efe6; --muted:#a7b0a4; --line:rgba(255,255,255,.13); --card:rgba(255,255,255,.035); --amber:#e8a23c; --green:#4fae6b; --warn:#f0a35e; --panel:rgba(13,23,17,.86); --serif:"Fraunces","Iowan Old Style","Palatino Linotype",Georgia,serif; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; }
-  #banner { display: none; background: #b3261e; color: #fff; text-align: center; padding: 6px; font-weight: 600; }
-  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 460px; min-height: 0; }
-  #map { min-height: 300px; background: #dfe7ea; }
-  #mapmsg { padding: 24px; color: var(--muted); }
-  aside { overflow-y: auto; overflow-x: hidden; min-width: 0; border-left: 1px solid var(--line); background: var(--bg); padding: 16px 18px 28px; }
-  h1 { font-size: 20px; margin: 0 0 2px; letter-spacing: -0.01em; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 22px 0 8px; }
+  body { font: 15px/1.45 "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #0d1711; overflow: hidden; }
+  #banner { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 30; background: #b3261e; color: #fff; text-align: center; padding: 6px; font-weight: 600; }
+  #map { position: fixed; inset: 0; }
+  #mapmsg { position: fixed; right: 24px; top: 24px; max-width: 320px; color: var(--muted); z-index: 5; }
+  aside { position: fixed; z-index: 20; left: 20px; top: 20px; bottom: 20px; width: 440px; max-width: calc(100vw - 40px); overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 16px; scrollbar-width: none; }
+  aside::-webkit-scrollbar { display: none; }
+  body.banner aside { top: 52px; }
+  .panel { background: var(--panel); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 22px; padding: 20px; flex: none; }
+  .panel:empty { display: none; }
+  h1 { font: 500 34px/1.05 var(--serif); margin: 0 0 4px; letter-spacing: -0.01em; }
+  h1 em { color: var(--amber); }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 22px 0 10px; }
+  h2:first-child { margin-top: 0; }
   p { margin: 0 0 8px; }
-  .sub { color: var(--muted); margin-bottom: 12px; }
+  .sub { color: var(--muted); margin-bottom: 14px; }
   .controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .row { display: flex; gap: 8px; }
-  input, select, button { font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); min-width: 0; }
-  input { flex: 1 1 0; width: 0; }
-  button { cursor: pointer; background: var(--accent); color: #fff; border-color: var(--accent); }
-  select { flex: 1 1 0; width: 0; }
+  input, select, button { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.05); color: var(--ink); min-width: 0; }
+  input::placeholder { color: var(--muted); }
+  select option { color: #111; }
+  input, select { flex: 1 1 0; width: 0; }
   #period { flex: 1.5 1 0; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-  .headline { font-size: 15px; }
-  .note { border-left: 3px solid var(--warn); padding: 6px 10px; background: #fff7ef; margin-bottom: 8px; }
-  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  button { cursor: pointer; }
+  button:hover { background: rgba(255,255,255,.12); }
+  #go, .primary { background: var(--amber); color: #20160a; border-color: var(--amber); font-weight: 600; }
+  #go:hover, .primary:hover { background: #f2b458; }
+  .pill { border-radius: 999px; padding: 9px 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border-radius: 999px; padding: 4px 12px; font-size: 13px; background: rgba(79,174,107,.12); }
+  span.chip { border: 1px solid var(--line); padding: 6px 14px; font-size: 15px; }
+  span.chip small { color: var(--muted); margin-left: 6px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat { border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .stat.future { border-color: var(--amber); }
+  .stat .k { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .stat .v { font: 500 28px/1.2 var(--serif); }
+  .stat.future .v { color: var(--amber); }
+  .stat .r { color: var(--muted); font-size: 13px; }
+  .hero { background: rgba(232,162,60,.09); border: 1px solid rgba(232,162,60,.55); border-radius: 18px; padding: 18px; margin-top: 16px; }
+  .hero .k { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--amber); }
+  .hero .name { font: 500 32px/1.15 var(--serif); margin: 6px 0 2px; }
+  .hero .meta { color: var(--muted); margin-bottom: 14px; }
+  .hero h2 { margin-top: 0; }
+  .hero .row { margin-top: 16px; flex-wrap: wrap; }
+  .hero p.small { margin: 10px 0 0; }
+  .note { border-left: 3px solid var(--warn); padding: 6px 10px; background: rgba(240,163,94,.12); margin: 10px 0; border-radius: 0 8px 8px 0; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
   th, td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
-  th { font-size: 12px; color: var(--muted); font-weight: 600; }
-  .twin-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-  .dot { width: 20px; height: 20px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-  .twin-name { font-weight: 600; }
-  .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
-  .tag.close { color: var(--accent); border-color: var(--accent); }
-  .tag.poor { color: var(--warn); border-color: var(--warn); }
-  .small { font-size: 12px; color: var(--muted); }
-  .bar { display: grid; grid-template-columns: 120px 1fr 38px; gap: 8px; align-items: center; font-size: 13px; margin: 2px 0; }
-  .bar i { display: block; height: 8px; border-radius: 4px; background: var(--accent); opacity: .75; }
-  .bar span:last-child { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-  ul { margin: 4px 0 0; padding-left: 18px; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .twin { cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .twin:hover { background: rgba(255,255,255,.07); }
+  .twin .name { font-size: 17px; }
+  .twin .q { color: var(--amber); font-size: 14px; white-space: nowrap; }
+  .twin .small { grid-column: 1 / -1; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+  .small { font-size: 13px; color: var(--muted); }
+  ul { margin: 4px 0 10px; padding-left: 18px; }
   li { margin: 2px 0; }
-  .pin { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; color: #fff; font: 700 12px system-ui; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
-  #empty { color: var(--muted); margin-top: 18px; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; grid-template-rows: 45vh auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; margin: 18px 0 10px; }
+  .pin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; color: #20160a; font: 700 11px system-ui; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,.6); cursor: pointer; }
+  .pin.farm { width: 20px; height: 20px; background: var(--green); box-shadow: 0 0 0 7px rgba(232,162,60,.35), 0 2px 10px rgba(0,0,0,.6); }
+  #empty { color: var(--muted); }
+  @media (max-width: 768px) { aside { top: auto; height: 58vh; left: 8px; right: 8px; bottom: 8px; width: auto; max-width: none; } }
 </style>
 </head>
 <body>
 <div id="banner">SYNTHETIC TEST DATA: invented numbers for development only. Run build_data.py for real data.</div>
-<main>
-  <div id="map"><div id="mapmsg"></div></div>
-  <aside>
-    <h1>Climate Twin Crop Advisor</h1>
-    <p class="sub">Click your farm on the map. We find the places whose climate today matches your farm's projected climate, and show what is grown there.</p>
+<div id="map"></div>
+<div id="mapmsg"></div>
+<aside>
+  <div class="panel">
+    <h1>Climate <em>Twin</em></h1>
+    <p class="sub">Your farm's future climate already exists somewhere today. Click your farm on the globe.</p>
     <div class="controls">
       <div class="row"><input id="place" placeholder="Search a place, or type lat, lon"><button id="go">Find</button></div>
       <div class="row">
@@ -71,25 +97,27 @@
       </div>
       <div class="chips" id="presets"></div>
     </div>
-    <div id="empty">No farm selected yet.</div>
-    <div id="out"></div>
-    <div id="about"></div>
-  </aside>
-</main>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  </div>
+  <div class="panel" id="results"><div id="empty">No farm selected yet.</div><div id="out"></div></div>
+  <div class="panel" id="about"></div>
+</aside>
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
 <script>
-const COLORS = ['#d95f02', '#1b9e77', '#7570b3', '#e7298a', '#66a61e'];
+const COLORS = ['#e8a23c', '#6fc7b0', '#b7a6f5', '#f08fb8', '#b9d86a'];
+const EMPTY = { type: 'FeatureCollection', features: [] };
+const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const pct = x => Math.round(x * 100) + '%';
-let map, layer, meta, current = null, geoQueue = Promise.resolve(), runId = 0;
+const wide = () => window.innerWidth > 768;
+let map, mapReady, markers = [], meta, current = null, geoQueue = Promise.resolve(), runId = 0;
 const nameCache = new Map();
 
 init().catch(e => { $('#empty').textContent = 'Could not start: ' + e.message; });
 
 async function init() {
   meta = await (await fetch('/api/meta')).json();
-  if (meta.synthetic) $('#banner').style.display = 'block';
+  if (meta.synthetic) { $('#banner').style.display = 'block'; document.body.classList.add('banner'); }
   for (const [value, label] of meta.periods) {
     const o = el('option', null, label.charAt(0).toUpperCase() + label.slice(1).replace(' average', '')); o.value = value; $('#period').append(o);
   }
@@ -101,14 +129,91 @@ async function init() {
   $('#go').onclick = search;
   $('#place').onkeydown = e => { if (e.key === 'Enter') search(); };
   renderAbout();
-  if (window.L) {
-    $('#mapmsg').remove();
-    map = L.map('map', { preferCanvas: true, worldCopyJump: true }).setView([20, 10], 2);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 10, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-    layer = L.layerGroup().addTo(map);
-    map.on('click', e => { const p = e.latlng.wrap(); run(p.lat, p.lng); });
+  initMap();
+}
+
+function initMap() {
+  if (!window.maplibregl) {
+    $('#mapmsg').textContent = 'The 3D map library could not load (no internet?). Use the search box or the place buttons.';
+    return;
+  }
+  try {
+    map = new maplibregl.Map({
+      container: 'map', style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [20, 15], zoom: 1.6, pitch: 15, maxPitch: 80,
+    });
+  } catch (e) { map = null; $('#mapmsg').textContent = 'The 3D map could not start: ' + e.message; return; }
+  const pad = () => map.setPadding({ left: wide() ? 480 : 0, top: 0, right: 0, bottom: wide() ? 0 : window.innerHeight * 0.5 });
+  pad(); window.addEventListener('resize', pad);
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+  mapReady = new Promise(ok => map.on('style.load', () => {
+    try { map.setProjection({ type: 'globe' }); } catch (e) { /* older library: stays flat */ }
+    try { map.setSky({ 'sky-color': '#0b1630', 'horizon-color': '#27406b', 'fog-color': '#0b1020', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 6, 0.6, 9, 0] }); } catch (e) { /* optional */ }
+    try {
+      map.addSource('dem', { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 14 });
+      map.addSource('hill', { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 14 });
+      map.setTerrain({ source: 'dem', exaggeration: 1.6 });
+      map.addLayer({ id: 'hillshade', type: 'hillshade', source: 'hill', paint: { 'hillshade-exaggeration': 0.35 } });
+    } catch (e) { /* terrain is decoration; carry on without it */ }
+    const color = ['match', ['get', 'k'], 0, COLORS[0], 1, COLORS[1], 2, COLORS[2], 3, COLORS[3], COLORS[4]];
+    map.addSource('matches', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'matches', type: 'circle', source: 'matches', paint: {
+      'circle-color': color, 'circle-opacity': ['get', 'o'],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 2, 4, 4, 8, 14], 'circle-blur': 0.3 } });
+    map.addSource('arcs', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'arcs', type: 'line', source: 'arcs', layout: { 'line-cap': 'round' },
+      paint: { 'line-color': color, 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
+    ok();
+  }));
+  map.on('click', e => { const p = e.lngLat.wrap(); run(p.lat, p.lng); });
+}
+
+// points along the great circle from a to b ([lat, lon]), longitudes kept continuous
+function arc(a, b, n = 64) {
+  const r = Math.PI / 180, la1 = a[0] * r, lo1 = a[1] * r, la2 = b[0] * r, lo2 = b[1] * r;
+  const d = 2 * Math.asin(Math.sqrt(Math.sin((la2 - la1) / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin((lo2 - lo1) / 2) ** 2));
+  if (d < 1e-6) return [[a[1], a[0]], [b[1], b[0]]];
+  const out = []; let prev = null;
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(la1) * Math.cos(lo1) + B * Math.cos(la2) * Math.cos(lo2);
+    const y = A * Math.cos(la1) * Math.sin(lo1) + B * Math.cos(la2) * Math.sin(lo2);
+    const z = A * Math.sin(la1) + B * Math.sin(la2);
+    let lon = Math.atan2(y, x) / r; const lat = Math.atan2(z, Math.hypot(x, y)) / r;
+    if (prev !== null) { while (lon - prev > 180) lon -= 360; while (lon - prev < -180) lon += 360; }
+    prev = lon; out.push([lon, lat]);
+  }
+  return out;
+}
+
+function fly3d(lat, lon) {
+  if (map) map.flyTo({ center: [lon, lat], zoom: 9.5, pitch: 62, bearing: Math.random() * 60 - 30, duration: 3500, essential: true });
+}
+
+async function draw(res, id) {
+  if (!map) return;
+  await mapReady;
+  if (id !== runId) return;
+  markers.forEach(m => m.remove()); markers = [];
+  const f = res.farm, from = [f.cell_lat, f.cell_lon];
+  map.getSource('matches').setData({ type: 'FeatureCollection', features: res.matches.map(([lat, lon, d, k]) => (
+    { type: 'Feature', properties: { k, o: Math.max(0.2, 0.8 - d) }, geometry: { type: 'Point', coordinates: [lon, lat] } })) });
+  map.getSource('arcs').setData({ type: 'FeatureCollection', features: res.twins.map((t, k) => (
+    { type: 'Feature', properties: { k }, geometry: { type: 'LineString', coordinates: arc(from, [t.lat, t.lon]) } })) });
+  const pin = (cls, label, color, lat, lon) => {
+    const d = el('div', 'pin ' + cls, label); if (color) d.style.background = color;
+    d.onclick = e => { e.stopPropagation(); fly3d(lat, lon); };
+    markers.push(new maplibregl.Marker({ element: d }).setLngLat([lon, lat]).addTo(map));
+  };
+  res.twins.forEach((t, k) => pin('', t.rank, COLORS[k % COLORS.length], t.lat, t.lon));
+  pin('farm', '', null, f.cell_lat, f.cell_lon);
+  const best = res.twins[0];
+  if (best) {
+    const mid = arc(from, [best.lat, best.lon], 2)[1];
+    const zoom = Math.max(1.4, Math.min(5, 6.2 - Math.log2(Math.max(200, best.distance_km) / 250)));
+    map.flyTo({ center: mid, zoom, pitch: 25, bearing: 0, duration: 2800, essential: true });
   } else {
-    $('#mapmsg').textContent = 'The map library could not load (no internet?). Use the search box or the place buttons.';
+    map.flyTo({ center: [f.cell_lon, f.cell_lat], zoom: 4, pitch: 25, duration: 2000, essential: true });
   }
 }
 
@@ -139,7 +244,7 @@ async function run(lat, lon) {
   } catch (e) { if (id === runId) showError(e.message); return; }
   if (id !== runId) return;
   render(res, id);
-  draw(res);
+  draw(res, id).catch(e => { $('#mapmsg').textContent = 'Map drawing failed: ' + e.message; });
 }
 
 function placeName(lat, lon, target, id) {
@@ -161,39 +266,51 @@ function placeName(lat, lon, target, id) {
 
 function fmt(v, info) { return v.toFixed(info[3]) + (info[2] ? ' ' + info[2] : ''); }
 
-function cropBars(crops) {
-  const box = el('div');
-  if (!crops.length) { box.append(el('p', 'small', 'No cropland recorded here.')); return box; }
-  for (const c of crops) {
-    const row = el('div', 'bar');
-    const bar = el('i'); bar.style.width = Math.max(2, c.share * 100) + '%';
-    const track = el('div'); track.append(bar);
-    row.append(el('span', null, c.name), track, el('span', null, pct(c.share)));
-    box.append(row);
-  }
+function cropChips(crops) {
+  const box = el('div', 'chips');
+  if (!crops.length) { box.append(el('span', 'small', 'No cropland recorded here.')); return box; }
+  for (const c of crops) { const ch = el('span', 'chip', c.name); ch.append(el('small', null, pct(c.share))); box.append(ch); }
   return box;
 }
 
 function render(res, id) {
   const out = $('#out'); out.replaceChildren();
-  const f = res.farm, best = res.twins[0];
+  const f = res.farm, best = res.twins[0], when = res.period_label.split(' (')[0];
+  const year = when.replace('around ', '');
+  const info = Object.fromEntries(meta.vars.map(v => [v[0], v]));
 
-  out.append(el('h2', null, 'Your answer'));
-  const head = el('div', 'card headline');
-  if (best && best.quality !== 'poor') {
-    const span = el('strong');
-    head.append('Your farm’s climate ' + res.period_label.split(' (')[0] + ' looks most like today’s climate in ', span,
-      `, ${best.distance_km.toLocaleString()} km to the ${best.direction}.`);
-    placeName(best.lat, best.lon, span, id);
-  } else if (best) {
-    head.append('No farmed region today is a close match for this farm’s projected climate. The nearest candidate is shown below, but treat it with caution.');
+  // farm today vs future
+  out.append(el('h2', null, `Your farm · ${f.lat.toFixed(2)}°, ${f.lon.toFixed(2)}°`));
+  const pair = el('div', 'pair');
+  const stat = (cls, k, c) => { const d = el('div', 'stat ' + cls); d.append(el('div', 'k', k), el('div', 'v', c.bio1.toFixed(1) + '°C'), el('div', 'r', Math.round(c.bio12).toLocaleString() + ' mm/yr')); return d; };
+  pair.append(stat('', 'Today', f.today), stat('future', '≈ ' + year, f.future));
+  out.append(pair);
+  const dt = f.future.bio1 - f.today.bio1, dr = f.today.bio12 > 0 ? (f.future.bio12 / f.today.bio12 - 1) * 100 : 0;
+  const line = el('p', 'small', `${dt >= 0 ? '+' : ''}${dt.toFixed(1)}°C ${dt >= 0 ? 'warmer' : 'cooler'} · ${dr >= 0 ? '+' : ''}${dr.toFixed(0)}% rainfall`);
+  line.style.marginTop = '10px'; out.append(line);
+
+  // best twin
+  const hero = el('div', 'hero');
+  if (best) {
+    const good = best.quality !== 'poor';
+    hero.append(el('div', 'k', good ? `Around ${year} your farm will feel like` : 'No close match today. Nearest candidate'));
+    const name = el('div', 'name'); placeName(best.lat, best.lon, name, id);
+    hero.append(name, el('div', 'meta', `${best.today.bio1.toFixed(1)}°C · ${Math.round(best.today.bio12).toLocaleString()} mm/yr · ${best.quality} match · ${best.distance_km.toLocaleString()} km ${best.direction}`));
+    hero.append(el('h2', null, 'What grows there today'), cropChips(best.crops));
+    hero.append(el('p', 'small', `${pct(best.irrigated_share)} of cropland there is irrigated.`));
+    if (map) {
+      const row = el('div', 'row');
+      const b1 = el('button', 'pill primary', 'Fly to twin →'); b1.onclick = () => fly3d(best.lat, best.lon);
+      const b2 = el('button', 'pill', 'Back to farm'); b2.onclick = () => fly3d(f.cell_lat, f.cell_lon);
+      row.append(b1, b2); hero.append(row);
+    }
   } else {
-    head.append('No twin region was found.');
+    hero.append(el('div', 'k', 'No twin region was found'));
   }
-  out.append(head);
+  out.append(hero);
   for (const n of res.notes) out.append(el('div', 'note', n));
 
-  // advice
+  // crop advice
   const a = res.advice;
   if (a.used) {
     out.append(el('h2', null, 'What this suggests for crops'));
@@ -206,75 +323,52 @@ function render(res, id) {
       card.append(ul);
     };
     section('Candidates to trial (grown in your twins, not near you)', a.try, 'None stand out.');
-    card.append(el('p'));
     section('Likely still suited (grown near you and in your twins)', a.keep, 'None.');
-    card.append(el('p'));
     section('Worth watching (grown near you, rare in your twins)', a.watch, 'None.');
     out.append(card);
   }
 
-  // climate table
-  out.append(el('h2', null, 'How your climate changes'));
-  const card = el('div', 'card'), table = el('table'), hr = el('tr');
-  for (const h of ['', 'Today', res.period_label.split(' (')[0].replace('around', '≈'), best ? 'Twin 1 today' : '']) hr.append(el('th', null, h));
-  table.append(hr);
-  for (const info of meta.vars) {
-    const tr = el('tr'), v = info[0];
-    tr.append(el('td', null, info[1]), el('td', null, fmt(f.today[v], info)), el('td', null, fmt(f.future[v], info)),
-      el('td', null, best ? fmt(best.today[v], info) : ''));
-    table.append(tr);
-  }
-  card.append(table);
-  card.append(el('p', 'small', `Size of the change at your farm: ${res.shift.toFixed(2)}. Distance from your future climate to twin 1: ${best ? best.climate_distance.toFixed(2) : 'n/a'} (0 = identical; same scale).`));
-  out.append(card);
-
-  // twins
-  if (res.twins.length) out.append(el('h2', null, 'Your climate twins'));
-  res.twins.forEach((t, k) => {
-    const c = el('div', 'card'), h = el('div', 'twin-head');
-    const dot = el('span', 'dot', t.rank); dot.style.background = COLORS[k % COLORS.length];
-    const name = el('span', 'twin-name'); placeName(t.lat, t.lon, name, id);
-    h.append(dot, name, el('span', 'tag ' + t.quality, t.quality + ' match'));
-    c.append(h, el('p', 'small', `${t.distance_km.toLocaleString()} km ${t.direction} · climate distance ${t.climate_distance.toFixed(2)} · ${pct(t.irrigated_share)} of cropland irrigated`), cropBars(t.crops));
-    c.style.cursor = 'pointer'; c.onclick = () => map && map.setView([t.lat, t.lon], 6);
+  // other twins
+  if (res.twins.length > 1) out.append(el('h2', null, 'Other close twins'));
+  res.twins.slice(1).forEach((t, i) => {
+    const c = el('div', 'card twin');
+    const name = el('span', 'name'), label = el('span'); placeName(t.lat, t.lon, label, id);
+    const dot = el('span', 'dot'); dot.style.background = COLORS[(i + 1) % COLORS.length];
+    name.append(dot, label);
+    c.append(name, el('span', 'q', t.quality + ' match'),
+      el('span', 'small', t.crops.slice(0, 4).map(x => x.name).join(' · ') || 'No cropland recorded'),
+      el('span', 'small', `${t.distance_km.toLocaleString()} km ${t.direction} · climate distance ${t.climate_distance.toFixed(2)}`));
+    c.onclick = () => fly3d(t.lat, t.lon);
     out.append(c);
   });
 
-  out.append(el('h2', null, `Grown within 50 km of your farm today`));
-  const fc = el('div', 'card');
-  fc.append(cropBars(f.crops));
-  if (f.crops.length) fc.append(el('p', 'small', `${pct(f.irrigated_share)} of this cropland is irrigated.`));
-  out.append(fc);
-}
+  out.append(el('h2', null, 'Grown within 50 km of your farm today'));
+  out.append(cropChips(f.crops));
 
-function pin(label, color) {
-  return L.divIcon({ className: '', html: `<div class="pin" style="background:${color}">${label}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
-}
-
-function draw(res) {
-  if (!map) return;
-  layer.clearLayers();
-  for (const [lat, lon, d, k] of res.matches)
-    L.circleMarker([lat, lon], { radius: 3, stroke: false, fillColor: COLORS[k % COLORS.length], fillOpacity: Math.max(0.15, 0.7 - d) }).addTo(layer);
-  const f = res.farm, pts = [[f.cell_lat, f.cell_lon]];
-  res.twins.forEach((t, k) => {
-    L.polyline([[f.cell_lat, f.cell_lon], [t.lat, t.lon]], { color: COLORS[k % COLORS.length], weight: 1.5, dashArray: '5 5' }).addTo(layer);
-    L.marker([t.lat, t.lon], { icon: pin(t.rank, COLORS[k % COLORS.length]) }).addTo(layer);
-    pts.push([t.lat, t.lon]);
-  });
-  L.marker([f.cell_lat, f.cell_lon], { icon: pin('★', '#1c2420'), zIndexOffset: 1000 }).addTo(layer);
-  map.fitBounds(pts, { padding: [50, 50], maxZoom: 6 });
+  // full climate comparison
+  const det = el('details'), table = el('table'), hr = el('tr');
+  det.append(el('summary', null, 'Full climate comparison'));
+  for (const h of ['', 'Today', '≈ ' + year, best ? 'Twin today' : '']) hr.append(el('th', null, h));
+  table.append(hr);
+  for (const v of meta.vars) {
+    const tr = el('tr');
+    tr.append(el('td', null, v[1]), el('td', null, fmt(f.today[v[0]], v)), el('td', null, fmt(f.future[v[0]], v)), el('td', null, best ? fmt(best.today[v[0]], v) : ''));
+    table.append(tr);
+  }
+  det.append(table, el('p', 'small', `Size of the change at your farm: ${res.shift.toFixed(2)}. Distance from your future climate to the top twin: ${best ? best.climate_distance.toFixed(2) : 'n/a'} (0 = identical; same scale).`));
+  out.append(det);
+  $('aside').scrollTop = 0;
 }
 
 function renderAbout() {
   const box = $('#about'); box.replaceChildren();
   box.append(el('h2', null, 'How to read this'));
-  const c = el('div', 'card small');
+  const c = el('div', 'small');
   const v = meta.validation;
   if (v) c.append(el('p', null, `Check on today's data: for farmed places with matching climates at least ${Math.round(v.min_km).toLocaleString()} km apart, the overlap in main crops is ${pct(v.top5_overlap_twin)}, versus ${pct(v.top5_overlap_random)} for random farmed pairs (${v.n.toLocaleString()} places sampled).`));
   c.append(
     el('p', null, 'A twin matches on temperature and rainfall only. Soil, irrigation, day length, pests, markets and know-how also decide what grows, so treat the crop lists as candidates to trial, not recommendations.'),
-    el('p', null, `Climate: WorldClim 2.1. "Today" is the 1970–2000 average; projections are CMIP6 (${meta.ssp}), averaged over ${meta.models.join(', ')}. Crops: SPAM 2010 harvested area.`));
+    el('p', null, `Climate: WorldClim 2.1. "Today" is the 1970–2000 average; projections are CMIP6 (${meta.ssp}), averaged over ${meta.models.join(', ')}. Crops: SPAM 2010 harvested area. Map: OpenFreeMap, OpenStreetMap.`));
   box.append(c);
 }
 </script>

@@ -25,3 +25,11 @@ Thumbs.db
 .venv/
 downloaded-images/
 __pycache__/
+data/
+.venv/
+__pycache__/
+downloaded-images/
+*.tif
+*.zip
+*.part
+.DS_Store
