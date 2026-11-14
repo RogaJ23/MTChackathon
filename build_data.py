@@ -38,6 +38,8 @@ SPAM_NAME = "spam2010v2r0_global_harv_area.geotiff.zip"
 SPAM_URL = "https://s3.amazonaws.com/mapspam/2010/v2.0/geotiff/" + SPAM_NAME   # often refuses downloads
 SPAM_DOI = "doi:10.7910/DVN/PRFF8V"            # the dataset's home on Harvard Dataverse
 DATAVERSE = "https://dataverse.harvard.edu"
+CKAN_MIRROR = "https://geokur-dmp.geo.tu-dresden.de/api/3/action/package_show?id=mapspam-harvested-area"
+AGENT = "Mozilla/5.0 (climate-twin build script)"
 SPAM_HELP = f"""
 Could not download the SPAM crop maps automatically. Get the file by hand (about 144 MB):
   1. Open https://doi.org/10.7910/DVN/PRFF8V in a browser.
@@ -62,7 +64,7 @@ def download(url, dest):
     print(f"  downloading {url}")
     ok = False
     if shutil.which("curl"):
-        r = subprocess.run(["curl", "-L", "--fail", "--retry", "3", "-C", "-",
+        r = subprocess.run(["curl", "-L", "--fail", "--retry", "3", "-C", "-", "-A", AGENT,
                             "-o", str(part), url])
         ok = r.returncode == 0
     else:
@@ -73,7 +75,7 @@ def download(url, dest):
                 ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 pass
-            req = urllib.request.Request(url, headers={"User-Agent": "climate-twin/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": AGENT})
             with urllib.request.urlopen(req, context=ctx) as r, open(part, "wb") as f:
                 shutil.copyfileobj(r, f, 1 << 20)
             ok = True
@@ -90,10 +92,10 @@ def fetch_text(url):
     """Return the body of a small text/JSON resource, or None."""
     try:
         if shutil.which("curl"):
-            r = subprocess.run(["curl", "-sL", "--fail", "--max-time", "60", url],
+            r = subprocess.run(["curl", "-sL", "--fail", "--max-time", "60", "-A", AGENT, url],
                                capture_output=True, text=True)
             return r.stdout if r.returncode == 0 and r.stdout else None
-        req = urllib.request.Request(url, headers={"User-Agent": "climate-twin/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": AGENT})
         with urllib.request.urlopen(req, timeout=60) as r:
             return r.read().decode()
     except Exception:                    # noqa: BLE001
@@ -110,8 +112,22 @@ def dataverse_spam_urls():
     urls = []
     for f in files:
         label = str(f.get("label", "")).lower()
-        if "harv" in label and "geotiff" in label and label.endswith(".zip"):
+        if "harv" in label and "tif" in label and label.endswith(".zip"):
             urls.append(f"{DATAVERSE}/api/access/datafile/{f['dataFile']['id']}")
+    return urls
+
+
+def mirror_spam_urls():
+    """Ask the GeoKur data catalogue (TU Dresden), which mirrors the same zip."""
+    try:
+        resources = json.loads(fetch_text(CKAN_MIRROR))["result"]["resources"]
+    except (TypeError, ValueError, KeyError):
+        return []
+    urls = []
+    for r in resources:
+        url = str(r.get("url", ""))
+        if "harv" in url.lower() and "tif" in url.lower() and url.lower().endswith(".zip"):
+            urls.append(url)
     return urls
 
 
@@ -136,10 +152,14 @@ def get_spam(raw):
             return True
     if download(SPAM_URL, dest) and good():
         return True
-    print("  first address failed; trying Harvard Dataverse")
-    for url in dataverse_spam_urls():
-        if download(url, dest) and good():
-            return True
+    for name, finder in (("Harvard Dataverse", dataverse_spam_urls), ("the GeoKur mirror", mirror_spam_urls)):
+        print(f"  that address failed; trying {name}")
+        urls = finder()
+        if not urls:
+            print(f"  could not get a download address from {name}")
+        for url in urls:
+            if download(url, dest) and good():
+                return True
     print(SPAM_HELP.format(dest=dest))
     return False
 

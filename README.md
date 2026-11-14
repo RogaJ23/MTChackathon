@@ -20,29 +20,40 @@ groundnut") instead of a temperature forecast.
 
 ## How to run
 
-Tested with Python 3.13. Needs internet for the one-time data download and for map tiles.
+Tested with Python 3.13. The map needs internet for tiles and place names.
+
+### Quick start (data included)
+
+The built data file `data/atlas.npz` (about 40 MB) is in this repository, so nothing needs to be
+downloaded.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-
-# one-time: download about 400 MB of public data and build data/atlas.npz (resumable)
-.venv/bin/python build_data.py
-#   smaller and faster (one climate model, about 250 MB):
-#   .venv/bin/python build_data.py --models MPI-ESM1-2-HR
-#   If the crop maps cannot be downloaded automatically, the script prints what to do:
-#   download spam2010v2r0_global_harv_area.geotiff.zip from https://doi.org/10.7910/DVN/PRFF8V
-#   into your Downloads folder and run the script again.
-
-# optional but recommended: run the check described below; the app displays the result
-.venv/bin/python evaluate.py
-
+.venv/bin/python -m pip install numpy
 .venv/bin/python app.py        # then open http://localhost:8000
 ```
 
-To work on the interface before the download finishes, `python make_demo_data.py` writes an
-invented dataset. The app shows a red "synthetic test data" banner while it is loaded. Do not
-demo or report anything from it.
+Open the page through `app.py` at that address. Opening `static/index.html` any other way
+shows a "could not start" error because the page needs the app's data service.
+
+### Rebuilding the data from the sources (optional)
+
+```sh
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python build_data.py     # about 400 MB of downloads, resumable
+.venv/bin/python evaluate.py       # re-runs the check described below
+```
+
+`build_data.py --models MPI-ESM1-2-HR` uses one climate model and downloads less.
+
+The crop maps come from a host that often refuses automatic downloads. The script tries the
+original address, Harvard Dataverse and a university mirror in turn. If all fail it prints
+what to do: download `spam2010v2r0_global_harv_area.geotiff.zip` from
+https://doi.org/10.7910/DVN/PRFF8V into your Downloads folder and run the script again.
+
+To work on the interface without real data, `python make_demo_data.py` writes an invented
+dataset. The app shows a red "synthetic test data" banner while it is loaded. Do not demo or
+report anything from it.
 
 ## Files
 
@@ -100,8 +111,8 @@ demo or report anything from it.
 ## Data sources
 
 - WorldClim 2.1 baseline and CMIP6 projections, 10 arc-minutes: https://www.worldclim.org
-  (Fick & Hijmans 2017). Check WorldClim's terms before redistributing; the `data/` folder is
-  git-ignored for that reason and because of its size.
+  (Fick & Hijmans 2017). `data/atlas.npz` is derived from it. WorldClim's terms limit
+  redistribution, so check them and remove that file before making this repository public.
 - SPAM 2010 v2.0 global harvested area, IFPRI: https://www.mapspam.info
   (Yu et al. 2020, doi:10.7910/DVN/PRFF8V).
 - Map tiles and place names: OpenStreetMap and Nominatim.
