@@ -25,7 +25,8 @@ Thumbs.db
 .venv/
 downloaded-images/
 __pycache__/
-data/
+# raw downloads stay out of git; the built atlas (about 40 MB) is committed so the app runs without them
+data/raw/
 .venv/
 __pycache__/
 downloaded-images/
