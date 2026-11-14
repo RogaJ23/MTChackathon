@@ -74,6 +74,28 @@
   .pin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; color: #20160a; font: 700 11px system-ui; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,.6); cursor: pointer; }
   .pin.farm { width: 20px; height: 20px; background: var(--green); box-shadow: 0 0 0 7px rgba(232,162,60,.35), 0 2px 10px rgba(0,0,0,.6); }
   #empty { color: var(--muted); }
+  .seed a { color: var(--amber); }
+  #report { display: none; }
+  @media print {
+    @page { margin: 14mm; }
+    html, body { height: auto; overflow: visible; background: #fff; }
+    #map, #mapmsg, aside, #banner { display: none !important; }
+    #report { display: block; color: #111; font: 11.5px/1.45 Georgia, "Times New Roman", serif; }
+    #report h1 { font: 700 22px Georgia, serif; margin: 0 0 2px; color: #111; }
+    #report h1 em { color: #a86a10; }
+    #report h2 { font: 700 12px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #333; margin: 14px 0 5px; border-bottom: 1px solid #999; padding-bottom: 2px; }
+    #report p { margin: 0 0 5px; }
+    #report .lead { font-size: 15px; margin: 8px 0; }
+    #report .meta { color: #444; }
+    #report table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    #report th, #report td { border-bottom: 1px solid #ccc; padding: 3px 5px; text-align: left; color: #111; vertical-align: top; }
+    #report th { font: 700 10.5px system-ui, sans-serif; color: #333; }
+    #report td.n, #report th.n { text-align: right; white-space: nowrap; }
+    #report ul { margin: 2px 0 6px; padding-left: 16px; }
+    #report .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    #report .warn { border: 1px solid #a86a10; padding: 5px 8px; margin: 6px 0; }
+    #report .foot { color: #444; font-size: 10px; margin-top: 10px; }
+  }
   @media (max-width: 768px) { aside { top: auto; height: 58vh; left: 8px; right: 8px; bottom: 8px; width: auto; max-width: none; } }
 </style>
 </head>
@@ -101,6 +123,7 @@
   <div class="panel" id="results"><div id="empty">No farm selected yet.</div><div id="out"></div></div>
   <div class="panel" id="about"></div>
 </aside>
+<div id="report"></div>
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
 <script>
 const COLORS = ['#e8a23c', '#6fc7b0', '#b7a6f5', '#f08fb8', '#b9d86a'];
@@ -111,7 +134,9 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const pct = x => Math.round(x * 100) + '%';
 const wide = () => window.innerWidth > 768;
 let map, mapReady, markers = [], meta, current = null, geoQueue = Promise.resolve(), runId = 0;
-const nameCache = new Map();
+const nameCache = new Map(), countryCache = new Map();
+let lastRes = null;
+const GENEBANK = 'https://www.genesys-pgr.org/a';
 
 init().catch(e => { $('#empty').textContent = 'Could not start: ' + e.message; });
 
@@ -258,7 +283,7 @@ function placeName(lat, lon, target, id) {
       const r = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=6&accept-language=en&lat=${lat}&lon=${lon}`)).json();
       const a = r.address || {};
       const name = [a.state || a.region || a.county || a.province, a.country].filter(Boolean).join(', ');
-      if (name) { nameCache.set(key, name); if (id === runId) target.textContent = name; }
+      if (name) { nameCache.set(key, name); if (a.country) countryCache.set(key, a.country); if (id === runId) target.textContent = name; }
     } catch (e) { /* keep coordinates */ }
     await new Promise(ok => setTimeout(ok, 1100));   // respect the geocoder's 1 request/second limit
   });
@@ -275,12 +300,14 @@ function cropChips(crops) {
 
 function render(res, id) {
   const out = $('#out'); out.replaceChildren();
+  lastRes = res;
   const f = res.farm, best = res.twins[0], when = res.period_label.split(' (')[0];
   const year = when.replace('around ', '');
   const info = Object.fromEntries(meta.vars.map(v => [v[0], v]));
 
   // farm today vs future
   out.append(el('h2', null, `Your farm · ${f.lat.toFixed(2)}°, ${f.lon.toFixed(2)}°`));
+  placeName(f.lat, f.lon, el('span'), id);     // look the farm's name up for the report
   const pair = el('div', 'pair');
   const stat = (cls, k, c) => { const d = el('div', 'stat ' + cls); d.append(el('div', 'k', k), el('div', 'v', c.bio1.toFixed(1) + '°C'), el('div', 'r', Math.round(c.bio12).toLocaleString() + ' mm/yr')); return d; };
   pair.append(stat('', 'Today', f.today), stat('future', '≈ ' + year, f.future));
@@ -308,6 +335,10 @@ function render(res, id) {
     hero.append(el('div', 'k', 'No twin region was found'));
   }
   out.append(hero);
+  const tools = el('div', 'row'); tools.style.marginTop = '12px';
+  const pb = el('button', 'pill', 'Print farm report'); pb.onclick = printReport;
+  const sb = el('button', 'pill', 'Copy text message'); sb.onclick = () => copyText(sb);
+  tools.append(pb, sb); out.append(tools);
   for (const n of res.notes) out.append(el('div', 'note', n));
 
   // crop advice
@@ -326,6 +357,16 @@ function render(res, id) {
     section('Likely still suited (grown near you and in your twins)', a.keep, 'None.');
     section('Worth watching (grown near you, rare in your twins)', a.watch, 'None.');
     out.append(card);
+    const crops = seedCrops(res);
+    if (crops.length) {
+      out.append(el('h2', null, 'Where to look for adapted seed'));
+      const sc = el('div', 'card seed');
+      sc.append(el('p', null, `Varieties of ${crops.map(c => c.name.toLowerCase()).join(', ')} from your twin regions are already grown in a climate like your future one. Ask your extension officer or national seed service for varieties from those regions.`));
+      const link = el('a', null, 'Search the Genesys gene bank catalogue'); link.href = GENEBANK; link.target = '_blank'; link.rel = 'noopener';
+      const pl = el('p', 'small'); pl.append(link, ' by crop and "Origin of material" (the twin\'s country). The printed report lists the regions for each crop.');
+      sc.append(pl);
+      out.append(sc);
+    }
   }
 
   // other twins
@@ -358,6 +399,108 @@ function render(res, id) {
   det.append(table, el('p', 'small', `Size of the change at your farm: ${res.shift.toFixed(2)}. Distance from your future climate to the top twin: ${best ? best.climate_distance.toFixed(2) : 'n/a'} (0 = identical; same scale).`));
   out.append(det);
   $('aside').scrollTop = 0;
+}
+
+const keyOf = (lat, lon) => lat.toFixed(2) + ',' + lon.toFixed(2);
+const coordText = (lat, lon) => `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(1)}°${lon >= 0 ? 'E' : 'W'}`;
+const nameOf = (lat, lon) => nameCache.get(keyOf(lat, lon)) || coordText(lat, lon);
+
+// crops worth sourcing seed for, each with the twin regions that grow it
+function seedCrops(res) {
+  const good = res.twins.filter(t => t.quality !== 'poor');
+  return [...res.advice.try, ...res.advice.keep].slice(0, 5).map(c => ({
+    name: c.name, isNew: res.advice.try.includes(c),
+    twins: good.filter(t => t.crops.some(x => x.name === c.name)),
+  })).filter(c => c.twins.length);
+}
+
+function summaryText(res) {
+  const f = res.farm, best = res.twins[0], year = res.period_label.split(' (')[0];
+  const dt = f.future.bio1 - f.today.bio1, dr = f.today.bio12 > 0 ? (f.future.bio12 / f.today.bio12 - 1) * 100 : 0;
+  let t = `Climate Twin, farm at ${coordText(f.lat, f.lon)}: ${year} expect about ${dt >= 0 ? '+' : ''}${dt.toFixed(1)}C and ${dr >= 0 ? '+' : ''}${dr.toFixed(0)}% rain.`;
+  if (!best || best.quality === 'poor' || !res.advice.used) return t + ' No farmed region today closely matches that climate, so no crop suggestions.';
+  t += ` That is like ${nameOf(best.lat, best.lon)} today, where farmers grow ${best.crops.slice(0, 3).map(c => c.name.toLowerCase()).join(', ')}.`;
+  const names = l => l.slice(0, 3).map(c => c.name.toLowerCase()).join(', ');
+  if (res.advice.try.length) t += ` Worth a trial: ${names(res.advice.try)}.`;
+  if (res.advice.keep.length) t += ` Likely still suited: ${names(res.advice.keep)}.`;
+  if (res.advice.watch.length) t += ` Watch: ${names(res.advice.watch)}.`;
+  return t + ' Trial small first. Ask your extension officer about seed.';
+}
+
+async function copyText(btn) {
+  if (!lastRes) return;
+  const text = summaryText(lastRes);
+  try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; }
+  catch (e) { window.prompt('Copy this message:', text); }
+  setTimeout(() => { btn.textContent = 'Copy text message'; }, 2000);
+}
+
+function buildReport(res) {
+  const box = $('#report'); box.replaceChildren();
+  const f = res.farm, best = res.twins[0], year = res.period_label.split(' (')[0], a = res.advice;
+  const add = (tag, cls, text) => { const e = el(tag, cls, text); box.append(e); return e; };
+  const h1 = add('h1'); h1.append('Climate ', el('em', null, 'Twin'), ' farm report');
+  add('p', 'meta', `Farm: ${nameOf(f.lat, f.lon)} (${f.lat.toFixed(2)}, ${f.lon.toFixed(2)}) · Climate ${res.period_label} · Printed ${new Date().toLocaleDateString()}`);
+  if (meta.synthetic) add('p', 'warn', 'SYNTHETIC TEST DATA. These numbers are invented. Do not use.');
+  if (best && best.quality !== 'poor') add('p', 'lead', `Your farm's climate ${year} looks most like today's climate in ${nameOf(best.lat, best.lon)}, ${best.distance_km.toLocaleString()} km to the ${best.direction}.`);
+  else add('p', 'lead', 'No farmed region today is a close match for this farm\'s projected climate. Treat everything below with caution.');
+  for (const n of res.notes) add('p', 'warn', n);
+
+  add('h2', null, 'What this suggests for crops');
+  if (a.used) {
+    const cols = add('div', 'cols');
+    const col = (title, items) => {
+      const d = el('div'); d.append(el('strong', null, title));
+      if (!items.length) d.append(el('p', null, 'None.'));
+      else { const ul = el('ul'); for (const it of items.slice(0, 6)) ul.append(el('li', null, `${it.name} (${it.twins} of ${it.of} twins)`)); d.append(ul); }
+      cols.append(d);
+    };
+    col('Candidates to trial', a.try); col('Likely still suited', a.keep); col('Worth watching', a.watch);
+    add('p', null, 'Candidates are grown in your twin regions but not near you. Likely still suited are grown in both. Worth watching are grown near you but rare in your twins.');
+  } else add('p', null, 'No crop suggestions, because no twin region matches closely enough.');
+
+  const crops = seedCrops(res);
+  if (crops.length) {
+    add('h2', null, 'Where to look for adapted seed');
+    const t = add('table'), hr = el('tr');
+    for (const h of ['Crop', 'Twin regions growing it (ask for varieties from here)']) hr.append(el('th', null, h));
+    t.append(hr);
+    for (const c of crops) { const tr = el('tr'); tr.append(el('td', null, c.name + (c.isNew ? ' (new to your area)' : '')), el('td', null, c.twins.map(x => nameOf(x.lat, x.lon)).join('; '))); t.append(tr); }
+    add('p', null, `Varieties from these regions already grow in a climate like your future one. Ask your extension officer or national seed service, or search the Genesys gene bank catalogue (${GENEBANK.replace('https://', '')}) by crop and "Origin of material".`).style.marginTop = '5px';
+  }
+
+  add('h2', null, 'Your climate twins');
+  const tt = add('table'), th = el('tr');
+  for (const [h, n] of [['#', 0], ['Region', 0], ['Distance', 1], ['Match', 0], ['Main crops today', 0], ['Irrigated', 1]]) th.append(el('th', n ? 'n' : null, h));
+  tt.append(th);
+  for (const t of res.twins) {
+    const tr = el('tr');
+    tr.append(el('td', null, t.rank), el('td', null, nameOf(t.lat, t.lon)), el('td', 'n', `${t.distance_km.toLocaleString()} km ${t.direction}`), el('td', null, t.quality),
+      el('td', null, t.crops.slice(0, 5).map(c => `${c.name} ${pct(c.share)}`).join(', ') || 'none recorded'), el('td', 'n', pct(t.irrigated_share)));
+    tt.append(tr);
+  }
+
+  add('h2', null, 'How your climate changes');
+  const ct = add('table'), ch = el('tr');
+  for (const [h, n] of [['', 0], ['Today', 1], [year, 1], [best ? 'Top twin today' : '', 1]]) ch.append(el('th', n ? 'n' : null, h));
+  ct.append(ch);
+  for (const v of meta.vars) {
+    const tr = el('tr');
+    tr.append(el('td', null, v[1]), el('td', 'n', fmt(f.today[v[0]], v)), el('td', 'n', fmt(f.future[v[0]], v)), el('td', 'n', best ? fmt(best.today[v[0]], v) : ''));
+    ct.append(tr);
+  }
+  add('p', null, `Grown within 50 km of the farm today: ${f.crops.map(c => `${c.name} ${pct(c.share)}`).join(', ') || 'no cropland recorded'}.`).style.marginTop = '5px';
+
+  const v = meta.validation;
+  add('p', 'foot', 'How to read this: a twin matches on temperature and rainfall only. Soil, irrigation, day length, pests, markets and know-how also decide what grows. Treat the crop lists as candidates to trial on a small area first, not as recommendations. '
+    + (v ? `Check on today's data: main-crop overlap is ${pct(v.top5_overlap_twin)} for places with matching climates at least ${Math.round(v.min_km).toLocaleString()} km apart, against ${pct(v.top5_overlap_random)} for random farmed pairs. ` : '')
+    + `Data: WorldClim 2.1 (today = 1970–2000 average; projections CMIP6 ${meta.ssp}, ${meta.models.join(', ')}); SPAM 2010 harvested area.`);
+}
+
+function printReport() {
+  if (!lastRes) return;
+  buildReport(lastRes);
+  window.print();
 }
 
 function renderAbout() {
