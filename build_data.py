@@ -11,6 +11,7 @@ Run:  python build_data.py            (about 400 MB of downloads, resumable)
       python build_data.py --models MPI-ESM1-2-HR   (smaller: one climate model)
 """
 import argparse
+import json
 import logging
 import re
 import shutil
@@ -33,8 +34,18 @@ FUTURE_URLS = [
     "https://geodata.ucdavis.edu/cmip6/10m/{m}/{s}/wc2.1_10m_bioc_{m}_{s}_{p}.tif",
     "https://geodata.ucdavis.edu/climate/worldclim/2_1/cmip6/10m/{m}/{s}/wc2.1_10m_bioc_{m}_{s}_{p}.tif",
 ]
-SPAM_URL = ("https://s3.amazonaws.com/mapspam/2010/v2.0/geotiff/"
-            "spam2010v2r0_global_harv_area.geotiff.zip")
+SPAM_NAME = "spam2010v2r0_global_harv_area.geotiff.zip"
+SPAM_URL = "https://s3.amazonaws.com/mapspam/2010/v2.0/geotiff/" + SPAM_NAME   # often refuses downloads
+SPAM_DOI = "doi:10.7910/DVN/PRFF8V"            # the dataset's home on Harvard Dataverse
+DATAVERSE = "https://dataverse.harvard.edu"
+SPAM_HELP = f"""
+Could not download the SPAM crop maps automatically. Get the file by hand (about 144 MB):
+  1. Open https://doi.org/10.7910/DVN/PRFF8V in a browser.
+  2. Download {SPAM_NAME}
+     (harvested area, GeoTIFF; not the CSV, physical area, yield or production files).
+  3. Leave it in your Downloads folder, or move it to {{dest}}
+  4. Run this script again. Everything already downloaded is kept.
+"""
 PERIODS = ["2021-2040", "2041-2060"]
 DEFAULT_MODELS = ["MPI-ESM1-2-HR", "MIROC6", "UKESM1-0-LL"]
 
@@ -72,6 +83,64 @@ def download(url, dest):
         part.rename(dest)
         return True
     part.unlink(missing_ok=True)
+    return False
+
+
+def fetch_text(url):
+    """Return the body of a small text/JSON resource, or None."""
+    try:
+        if shutil.which("curl"):
+            r = subprocess.run(["curl", "-sL", "--fail", "--max-time", "60", url],
+                               capture_output=True, text=True)
+            return r.stdout if r.returncode == 0 and r.stdout else None
+        req = urllib.request.Request(url, headers={"User-Agent": "climate-twin/1.0"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return r.read().decode()
+    except Exception:                    # noqa: BLE001
+        return None
+
+
+def dataverse_spam_urls():
+    """Ask Harvard Dataverse for the download address of the harvested-area GeoTIFF zip."""
+    text = fetch_text(f"{DATAVERSE}/api/datasets/:persistentId/?persistentId={SPAM_DOI}")
+    try:
+        files = json.loads(text)["data"]["latestVersion"]["files"]
+    except (TypeError, ValueError, KeyError):
+        return []
+    urls = []
+    for f in files:
+        label = str(f.get("label", "")).lower()
+        if "harv" in label and "geotiff" in label and label.endswith(".zip"):
+            urls.append(f"{DATAVERSE}/api/access/datafile/{f['dataFile']['id']}")
+    return urls
+
+
+def get_spam(raw):
+    """Make sure raw/spam_harv_area.zip exists and is a real zip. Returns True on success."""
+    dest = Path(raw) / "spam_harv_area.zip"
+
+    def good():
+        if dest.exists() and zipfile.is_zipfile(dest):
+            return True
+        dest.unlink(missing_ok=True)     # e.g. an error page saved under the zip's name
+        return False
+
+    if good():
+        print(f"  have {dest.name}")
+        return True
+    # a copy the user already downloaded by hand
+    for manual in (Path(raw) / SPAM_NAME, Path(SPAM_NAME), Path.home() / "Downloads" / SPAM_NAME):
+        if manual.exists() and zipfile.is_zipfile(manual):
+            print(f"  using {manual}")
+            shutil.copyfile(manual, dest)
+            return True
+    if download(SPAM_URL, dest) and good():
+        return True
+    print("  first address failed; trying Harvard Dataverse")
+    for url in dataverse_spam_urls():
+        if download(url, dest) and good():
+            return True
+    print(SPAM_HELP.format(dest=dest))
     return False
 
 
@@ -230,8 +299,8 @@ def main():
                 dest = raw / f"wc2.1_10m_bioc_{m}_{a.ssp}_{p}.tif"
                 if not any(download(u.format(m=m, s=a.ssp, p=p), dest) for u in FUTURE_URLS):
                     print(f"  WARNING: no projection for {m} {p}; continuing without it")
-        if not download(SPAM_URL, raw / "spam_harv_area.zip"):
-            sys.exit("could not download the SPAM crop maps")
+        if not get_spam(raw):
+            sys.exit(1)
 
     print("2/4 reading baseline climate")
     cur = load_baseline(raw)

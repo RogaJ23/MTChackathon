@@ -30,6 +30,9 @@ python3 -m venv .venv
 .venv/bin/python build_data.py
 #   smaller and faster (one climate model, about 250 MB):
 #   .venv/bin/python build_data.py --models MPI-ESM1-2-HR
+#   If the crop maps cannot be downloaded automatically, the script prints what to do:
+#   download spam2010v2r0_global_harv_area.geotiff.zip from https://doi.org/10.7910/DVN/PRFF8V
+#   into your Downloads folder and run the script again.
 
 # optional but recommended: run the check described below; the app displays the result
 .venv/bin/python evaluate.py
@@ -71,11 +74,15 @@ demo or report anything from it.
   climate match at least 1,000 km away using today's climate for both, and measure the overlap
   in main crops (shared top-5 crops divided by all top-5 crops in either place). The baseline is
   a random farmed cell at least 1,000 km away.
-  Result on real data: **TODO paste the line printed by evaluate.py**.
+  Result on real data (1,500 sampled farmed cells): main-crop overlap is 29% for climate
+  matches against 15% for random farmed pairs (standard errors about 0.5 points). The
+  closer-matching half scores 35%, the looser half 24%. Crop-mix cosine similarity is 0.44
+  against 0.23. Caveat: SPAM places crops partly by climate-based suitability, so part of
+  this link is built into the crop maps.
 - **Identity test**: when the "future" is set equal to today's climate, the best match is the
   farm's own cell at distance 0.
 - **Data build**: tested end to end on rasters written in the same file layout as the sources.
-  **TODO: confirm the cell and crop counts printed by build_data.py on the real download.**
+  On the real download it found 236,742 cells with crops.
 - **Spot checks**: **TODO list two or three farms where the twin and crops look sensible, and one
   where the tool reports no good match.**
 
