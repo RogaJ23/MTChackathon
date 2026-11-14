@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Climate Twin Crop Advisor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --ink:#1c2420; --muted:#5d6a63; --line:#dfe5df; --bg:#f6f7f3; --card:#fff; --accent:#1f6f4a; --warn:#a4501a; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; }
+  #banner { display: none; background: #b3261e; color: #fff; text-align: center; padding: 6px; font-weight: 600; }
+  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 460px; min-height: 0; }
+  #map { min-height: 300px; background: #dfe7ea; }
+  #mapmsg { padding: 24px; color: var(--muted); }
+  aside { overflow-y: auto; overflow-x: hidden; min-width: 0; border-left: 1px solid var(--line); background: var(--bg); padding: 16px 18px 28px; }
+  h1 { font-size: 20px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 22px 0 8px; }
+  p { margin: 0 0 8px; }
+  .sub { color: var(--muted); margin-bottom: 12px; }
+  .controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .row { display: flex; gap: 8px; }
+  input, select, button { font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); min-width: 0; }
+  input { flex: 1 1 0; width: 0; }
+  button { cursor: pointer; background: var(--accent); color: #fff; border-color: var(--accent); }
+  select { flex: 1 1 0; width: 0; }
+  #period { flex: 1.5 1 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .headline { font-size: 15px; }
+  .note { border-left: 3px solid var(--warn); padding: 6px 10px; background: #fff7ef; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .twin-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .dot { width: 20px; height: 20px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .twin-name { font-weight: 600; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .tag.close { color: var(--accent); border-color: var(--accent); }
+  .tag.poor { color: var(--warn); border-color: var(--warn); }
+  .small { font-size: 12px; color: var(--muted); }
+  .bar { display: grid; grid-template-columns: 120px 1fr 38px; gap: 8px; align-items: center; font-size: 13px; margin: 2px 0; }
+  .bar i { display: block; height: 8px; border-radius: 4px; background: var(--accent); opacity: .75; }
+  .bar span:last-child { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  ul { margin: 4px 0 0; padding-left: 18px; }
+  li { margin: 2px 0; }
+  .pin { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; color: #fff; font: 700 12px system-ui; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  #empty { color: var(--muted); margin-top: 18px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; grid-template-rows: 45vh auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="banner">SYNTHETIC TEST DATA: invented numbers for development only. Run build_data.py for real data.</div>
+<main>
+  <div id="map"><div id="mapmsg"></div></div>
+  <aside>
+    <h1>Climate Twin Crop Advisor</h1>
+    <p class="sub">Click your farm on the map. We find the places whose climate today matches your farm's projected climate, and show what is grown there.</p>
+    <div class="controls">
+      <div class="row"><input id="place" placeholder="Search a place, or type lat, lon"><button id="go">Find</button></div>
+      <div class="row">
+        <select id="period" aria-label="Future period"></select>
+        <select id="minkm" aria-label="Minimum distance of twins">
+          <option value="100">Twins ≥ 100 km away</option>
+          <option value="500">Twins ≥ 500 km away</option>
+          <option value="1000">Twins ≥ 1,000 km away</option>
+        </select>
+      </div>
+      <div class="chips" id="presets"></div>
+    </div>
+    <div id="empty">No farm selected yet.</div>
+    <div id="out"></div>
+    <div id="about"></div>
+  </aside>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const COLORS = ['#d95f02', '#1b9e77', '#7570b3', '#e7298a', '#66a61e'];
+const $ = s => document.querySelector(s);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const pct = x => Math.round(x * 100) + '%';
+let map, layer, meta, current = null, geoQueue = Promise.resolve(), runId = 0;
+const nameCache = new Map();
+
+init().catch(e => { $('#empty').textContent = 'Could not start: ' + e.message; });
+
+async function init() {
+  meta = await (await fetch('/api/meta')).json();
+  if (meta.synthetic) $('#banner').style.display = 'block';
+  for (const [value, label] of meta.periods) {
+    const o = el('option', null, label.charAt(0).toUpperCase() + label.slice(1).replace(' average', '')); o.value = value; $('#period').append(o);
+  }
+  $('#period').value = meta.default_period;
+  for (const [name, lat, lon] of meta.presets) {
+    const b = el('button', 'chip', name); b.onclick = () => run(lat, lon); $('#presets').append(b);
+  }
+  $('#period').onchange = $('#minkm').onchange = () => current && run(current.lat, current.lon);
+  $('#go').onclick = search;
+  $('#place').onkeydown = e => { if (e.key === 'Enter') search(); };
+  renderAbout();
+  if (window.L) {
+    $('#mapmsg').remove();
+    map = L.map('map', { preferCanvas: true, worldCopyJump: true }).setView([20, 10], 2);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 10, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+    map.on('click', e => { const p = e.latlng.wrap(); run(p.lat, p.lng); });
+  } else {
+    $('#mapmsg').textContent = 'The map library could not load (no internet?). Use the search box or the place buttons.';
+  }
+}
+
+async function search() {
+  const q = $('#place').value.trim();
+  if (!q) return;
+  const m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (m) return run(+m[1], +m[2]);
+  try {
+    const r = await (await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=en&q=' + encodeURIComponent(q))).json();
+    if (!r.length) throw new Error('not found');
+    run(+r[0].lat, +r[0].lon);
+  } catch (e) { showError('Could not find "' + q + '". Try clicking the map or typing lat, lon.'); }
+}
+
+function showError(msg) { $('#out').replaceChildren(el('div', 'note', msg)); $('#empty').style.display = 'none'; }
+
+async function run(lat, lon) {
+  const id = ++runId;
+  current = { lat, lon };
+  $('#empty').style.display = 'none';
+  $('#out').replaceChildren(el('p', 'small', 'Searching the world for matching climates…'));
+  let res;
+  try {
+    const r = await fetch(`/api/twin?lat=${lat}&lon=${lon}&period=${$('#period').value}&min_km=${$('#minkm').value}`);
+    res = await r.json();
+    if (!r.ok) throw new Error(res.error || 'request failed');
+  } catch (e) { if (id === runId) showError(e.message); return; }
+  if (id !== runId) return;
+  render(res, id);
+  draw(res);
+}
+
+function placeName(lat, lon, target, id) {
+  const key = lat.toFixed(2) + ',' + lon.toFixed(2);
+  const fallback = `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(1)}°${lon >= 0 ? 'E' : 'W'}`;
+  target.textContent = nameCache.get(key) || fallback;
+  if (nameCache.has(key)) return;
+  geoQueue = geoQueue.then(async () => {
+    if (id !== runId) return;
+    try {
+      const r = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=6&accept-language=en&lat=${lat}&lon=${lon}`)).json();
+      const a = r.address || {};
+      const name = [a.state || a.region || a.county || a.province, a.country].filter(Boolean).join(', ');
+      if (name) { nameCache.set(key, name); if (id === runId) target.textContent = name; }
+    } catch (e) { /* keep coordinates */ }
+    await new Promise(ok => setTimeout(ok, 1100));   // respect the geocoder's 1 request/second limit
+  });
+}
+
+function fmt(v, info) { return v.toFixed(info[3]) + (info[2] ? ' ' + info[2] : ''); }
+
+function cropBars(crops) {
+  const box = el('div');
+  if (!crops.length) { box.append(el('p', 'small', 'No cropland recorded here.')); return box; }
+  for (const c of crops) {
+    const row = el('div', 'bar');
+    const bar = el('i'); bar.style.width = Math.max(2, c.share * 100) + '%';
+    const track = el('div'); track.append(bar);
+    row.append(el('span', null, c.name), track, el('span', null, pct(c.share)));
+    box.append(row);
+  }
+  return box;
+}
+
+function render(res, id) {
+  const out = $('#out'); out.replaceChildren();
+  const f = res.farm, best = res.twins[0];
+
+  out.append(el('h2', null, 'Your answer'));
+  const head = el('div', 'card headline');
+  if (best && best.quality !== 'poor') {
+    const span = el('strong');
+    head.append('Your farm’s climate ' + res.period_label.split(' (')[0] + ' looks most like today’s climate in ', span,
+      `, ${best.distance_km.toLocaleString()} km to the ${best.direction}.`);
+    placeName(best.lat, best.lon, span, id);
+  } else if (best) {
+    head.append('No farmed region today is a close match for this farm’s projected climate. The nearest candidate is shown below, but treat it with caution.');
+  } else {
+    head.append('No twin region was found.');
+  }
+  out.append(head);
+  for (const n of res.notes) out.append(el('div', 'note', n));
+
+  // advice
+  const a = res.advice;
+  if (a.used) {
+    out.append(el('h2', null, 'What this suggests for crops'));
+    const card = el('div', 'card');
+    const section = (title, items, empty) => {
+      card.append(el('strong', null, title));
+      if (!items.length) { card.append(el('p', 'small', empty)); return; }
+      const ul = el('ul');
+      for (const it of items.slice(0, 6)) ul.append(el('li', null, `${it.name}: grown in ${it.twins} of ${it.of} twin regions`));
+      card.append(ul);
+    };
+    section('Candidates to trial (grown in your twins, not near you)', a.try, 'None stand out.');
+    card.append(el('p'));
+    section('Likely still suited (grown near you and in your twins)', a.keep, 'None.');
+    card.append(el('p'));
+    section('Worth watching (grown near you, rare in your twins)', a.watch, 'None.');
+    out.append(card);
+  }
+
+  // climate table
+  out.append(el('h2', null, 'How your climate changes'));
+  const card = el('div', 'card'), table = el('table'), hr = el('tr');
+  for (const h of ['', 'Today', res.period_label.split(' (')[0].replace('around', '≈'), best ? 'Twin 1 today' : '']) hr.append(el('th', null, h));
+  table.append(hr);
+  for (const info of meta.vars) {
+    const tr = el('tr'), v = info[0];
+    tr.append(el('td', null, info[1]), el('td', null, fmt(f.today[v], info)), el('td', null, fmt(f.future[v], info)),
+      el('td', null, best ? fmt(best.today[v], info) : ''));
+    table.append(tr);
+  }
+  card.append(table);
+  card.append(el('p', 'small', `Size of the change at your farm: ${res.shift.toFixed(2)}. Distance from your future climate to twin 1: ${best ? best.climate_distance.toFixed(2) : 'n/a'} (0 = identical; same scale).`));
+  out.append(card);
+
+  // twins
+  if (res.twins.length) out.append(el('h2', null, 'Your climate twins'));
+  res.twins.forEach((t, k) => {
+    const c = el('div', 'card'), h = el('div', 'twin-head');
+    const dot = el('span', 'dot', t.rank); dot.style.background = COLORS[k % COLORS.length];
+    const name = el('span', 'twin-name'); placeName(t.lat, t.lon, name, id);
+    h.append(dot, name, el('span', 'tag ' + t.quality, t.quality + ' match'));
+    c.append(h, el('p', 'small', `${t.distance_km.toLocaleString()} km ${t.direction} · climate distance ${t.climate_distance.toFixed(2)} · ${pct(t.irrigated_share)} of cropland irrigated`), cropBars(t.crops));
+    c.style.cursor = 'pointer'; c.onclick = () => map && map.setView([t.lat, t.lon], 6);
+    out.append(c);
+  });
+
+  out.append(el('h2', null, `Grown within 50 km of your farm today`));
+  const fc = el('div', 'card');
+  fc.append(cropBars(f.crops));
+  if (f.crops.length) fc.append(el('p', 'small', `${pct(f.irrigated_share)} of this cropland is irrigated.`));
+  out.append(fc);
+}
+
+function pin(label, color) {
+  return L.divIcon({ className: '', html: `<div class="pin" style="background:${color}">${label}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+}
+
+function draw(res) {
+  if (!map) return;
+  layer.clearLayers();
+  for (const [lat, lon, d, k] of res.matches)
+    L.circleMarker([lat, lon], { radius: 3, stroke: false, fillColor: COLORS[k % COLORS.length], fillOpacity: Math.max(0.15, 0.7 - d) }).addTo(layer);
+  const f = res.farm, pts = [[f.cell_lat, f.cell_lon]];
+  res.twins.forEach((t, k) => {
+    L.polyline([[f.cell_lat, f.cell_lon], [t.lat, t.lon]], { color: COLORS[k % COLORS.length], weight: 1.5, dashArray: '5 5' }).addTo(layer);
+    L.marker([t.lat, t.lon], { icon: pin(t.rank, COLORS[k % COLORS.length]) }).addTo(layer);
+    pts.push([t.lat, t.lon]);
+  });
+  L.marker([f.cell_lat, f.cell_lon], { icon: pin('★', '#1c2420'), zIndexOffset: 1000 }).addTo(layer);
+  map.fitBounds(pts, { padding: [50, 50], maxZoom: 6 });
+}
+
+function renderAbout() {
+  const box = $('#about'); box.replaceChildren();
+  box.append(el('h2', null, 'How to read this'));
+  const c = el('div', 'card small');
+  const v = meta.validation;
+  if (v) c.append(el('p', null, `Check on today's data: for farmed places with matching climates at least ${Math.round(v.min_km).toLocaleString()} km apart, the overlap in main crops is ${pct(v.top5_overlap_twin)}, versus ${pct(v.top5_overlap_random)} for random farmed pairs (${v.n.toLocaleString()} places sampled).`));
+  c.append(
+    el('p', null, 'A twin matches on temperature and rainfall only. Soil, irrigation, day length, pests, markets and know-how also decide what grows, so treat the crop lists as candidates to trial, not recommendations.'),
+    el('p', null, `Climate: WorldClim 2.1. "Today" is the 1970–2000 average; projections are CMIP6 (${meta.ssp}), averaged over ${meta.models.join(', ')}. Crops: SPAM 2010 harvested area.`));
+  box.append(c);
+}
+</script>
+</body>
+</html>
