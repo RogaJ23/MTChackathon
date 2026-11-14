@@ -156,7 +156,7 @@ def load_baseline(raw):
             sys.exit(f"baseline file for bio_{n} not found under {raw/'base'}")
         arr, scale, tie, nodata = read_raster(hits[0])
         layers.append(to_global(clean(arr[0], nodata), scale, tie, RES, H, W))
-    return np.stack(layers, -1)          # (H, W, 7)
+    return np.stack(layers, -1)          # (H, W, 7) very cool thing
 
 
 def load_future(raw, models, ssp, period):

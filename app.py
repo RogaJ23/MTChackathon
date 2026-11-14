@@ -16,7 +16,6 @@ PRESETS = [
     ["Mato Grosso, Brazil", -13.0, -56.0], ["North China Plain", 36.5, 115.5],
 ]
 
-
 def make_handler(atlas, validation):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -72,6 +71,7 @@ def main():
         validation = None                    # never show a check computed on different data
     print(f"{atlas.n:,} land cells, {int(atlas.farmed.sum()):,} farmed"
           + ("  [SYNTHETIC TEST DATA]" if atlas.synthetic else ""))
+    # lets do this in a function so we can pass in the atlas and validation data
     print(f"open http://localhost:{a.port}")
     ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(atlas, validation)).serve_forever()
 
