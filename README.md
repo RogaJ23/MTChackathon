@@ -3,7 +3,7 @@
 **See your farm's future climate in places already farming under similar conditions today.**
 
 *DNAForge × MTC Berkeley Hackathon 2026 · Agricultural Resilience*  
-[GitHub repository](https://github.com/RogaJ23/MTChackathon) · Team ID: **[add ID]**
+[GitHub repository](https://github.com/RogaJ23/MTChackathon) · Team ID: **[T4]**
 
 ## The problem
 
