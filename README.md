@@ -55,14 +55,40 @@ To work on the interface without real data, `python make_demo_data.py` writes an
 dataset. The app shows a red "synthetic test data" banner while it is loaded. Do not demo or
 report anything from it.
 
-### Optional: gene bank lookup (experimental, untested against the live service)
+### Optional: gene bank lookup (experimental)
 
-If the environment variables `GENESYS_CLIENT_ID` and `GENESYS_CLIENT_SECRET` are set before
-`app.py` starts, the "Where to look for adapted seed" card also lists gene bank samples
-(accessions) of each suggested crop collected within about 3 degrees of the top twin, from
-the Genesys PGR catalogue. Genesys issues those credentials. Without them the feature is off
-and nothing else changes. This lookup follows the request format of the genesysr R client
-and has only been tested against a local stand-in for the service.
+**Status: built, switched off by default, and not yet run against the live Genesys service.**
+Without credentials the app behaves exactly as described above.
+
+When it is switched on, the "Where to look for adapted seed" card lists gene bank samples
+(accessions) of each suggested crop collected within about 3 degrees of the top twin region,
+from the Genesys PGR catalogue (https://www.genesys-pgr.org). Each entry shows the accession
+number, name, species and holding institute.
+
+**1. Get credentials.** Genesys data access needs a login. You need a client ID and client
+secret issued by Genesys for your own application, enabled for the OAuth "client credentials"
+grant. Create a Genesys account and look for API clients in your profile, or ask the Genesys
+helpdesk.
+
+**2. Start the app with them.** In the terminal where you run the app:
+
+```sh
+export GENESYS_CLIENT_ID="your-client-id"
+export GENESYS_CLIENT_SECRET="your-client-secret"
+.venv/bin/python app.py
+```
+
+Never put these values in a file in this repository.
+
+**3. Check it.** Pick a farm. The seed card shows "Looking up gene bank samples…" and then a
+list. To see the raw reply or an error message, open
+`http://localhost:8000/api/seed?crop=Sorghum&lat=14.4&lon=33.5`.
+
+**If it reports an error.** The login step follows the official genesysr R client. The query
+address (`/api/v1/acn/query`) and the reply's column names have only been tested against a
+local stand-in, so they may need adjusting. The address can be changed without editing code:
+`export GENESYS_QUERY_PATH="/api/v2/..."`. A failed lookup shows "Gene bank lookup is
+unavailable right now" and does not affect the rest of the app.
 
 ## Files
 
