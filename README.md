@@ -1,128 +1,80 @@
 # Climate Twin Crop Advisor
 
-Agricultural resilience track.
+**See your farm's future climate in places already farming under similar conditions today.**
 
-Pick any farm on a map. The tool finds the places whose climate **today** matches that farm's
-**projected** climate (around 2030, 2040 or 2050) and shows which crops are grown there. A farmer
-gets a concrete answer ("your 2040 looks like region X today, where they grow sorghum and
-groundnut") instead of a temperature forecast.
+*DNAForge × MTC Berkeley Hackathon 2026 · Agricultural Resilience*  
+[GitHub repository](https://github.com/RogaJ23/MTChackathon) · Team ID: **[add ID]**
+
+## The problem
+
+Climate forecasts tell farmers **what may change**, but not **what they could try**. For smallholder farmers and under-resourced communities, turning complex climate data into practical adaptation research can be especially difficult.
+
+## Our solution
+
+**Climate Twin** lets you select a farm, explore its projected future climate, and find farmed regions experiencing similar conditions **today**. It then shows which crops are grown in those regions as **ideas for small local trials**—not guaranteed planting recommendations.
+
+**Why it matters:** Agricultural extension officers can turn complex projections into a map, a printable handout, or a short message farmers can discuss and act on with local guidance.
 
 ## What it does
 
-1. Looks up the farm's climate today and its projected climate (seven temperature and rainfall measures).
-2. Compares that projected climate with today's climate in every farmed 10 arc-minute cell on Earth (about 18 km at the equator).
-3. Groups the best matches into up to five "twin" regions at least 500 km apart from each other.
-4. Compares the crops grown in the twins with the crops grown within 50 km of the farm, and sorts them into:
-   - **candidates to trial**: grown in the twins, not grown near the farm
-   - **likely still suited**: grown near the farm and in the twins
-   - **worth watching**: grown near the farm but rare in the twins
-5. Says so plainly when no farmed region today is a good match (a "novel" climate) and withholds crop suggestions.
+- **Explore future climate:** Compare seven temperature and rainfall indicators for your farm across historical and future periods.
+- **Find climate twins:** Map up to five farmed regions with climates resembling your farm's projected conditions.
+- **Compare crops:** See **Candidates to trial**, **Likely still suited**, and **Worth watching**, alongside irrigation context.
+- **Show uncertainty:** Label matches *close*, *partial*, or *poor*. Avoid crop suggestions when no suitable farmed match is found.
+- **Print farm report:** Create a one-page handout with crop lists, twin regions to ask about seed, climate and twin tables, and caveats.
+- **Copy text message:** Share a plain-language climate and crop summary through SMS or WhatsApp.
 
-## How to run
+## Try it locally
 
-Tested with Python 3.13. The map needs internet for tiles and place names.
+The repository includes a prebuilt climate-and-crop atlas, so **you do not need to download the large source datasets** just to run the app.
 
-### Quick start (data included)
-
-The built data file `data/atlas.npz` (about 40 MB) is in this repository, so nothing needs to be
-downloaded.
-
-```sh
+```bash
+git clone https://github.com/RogaJ23/MTChackathon.git
+cd MTChackathon
 python3 -m venv .venv
 .venv/bin/python -m pip install numpy
-.venv/bin/python app.py        # then open http://localhost:8000
+.venv/bin/python app.py
 ```
 
-Open the page through `app.py` at that address. Opening `static/index.html` any other way
-shows a "could not start" error because the page needs the app's data service.
+Open **http://localhost:8000**. Internet access is needed for map tiles and place search; no API key is required.
 
-### Rebuilding the data from the sources (optional)
+**Quick demo:** Choose a farm preset → select a future period → inspect its best climate twin → compare crops → print a report or copy a message.
 
-```sh
+## What we tested
+
+The repository's saved [evaluation results](data/validation.json) compare climate twins with random distant farmed regions across **1,500 locations**, using real (non-synthetic) atlas data.
+
+| Crop similarity measure | Climate twins | Random regions |
+|---|---:|---:|
+| Shared top-five crops | **29.2%** | 15.4% |
+| Crop-mix cosine similarity | **0.435** | 0.231 |
+
+These results support the **climate–crop similarity concept**, not future crop performance. The team also successfully launched the app from a fresh GitHub clone. **Six to eight farm-specific plausibility checks remain to be documented**, including any poor or missing matches.
+
+To reproduce the saved comparison:
+
+```bash
+.venv/bin/python evaluate.py --data data/atlas.npz --n 1500 --min-km 1000 --seed 0
+```
+
+## Challenges we faced
+
+- **Why we used published climate projections:** A physical climate model simulates complex atmospheric and ocean processes and takes major scientific resources to develop. Even a credible ML emulator needs extensive historical data and compute. For a one-day hackathon, using established **WorldClim/CMIP6 projections** was more reliable than training a rushed climate model.
+- **Poor hackathon Wi-Fi:** Downloading global climate and crop datasets was difficult under the time limit. We prioritized a **compact, prebuilt atlas** and an app judges could run locally.
+
+## Data, limitations, and rebuilding
+
+- **Climate:** [WorldClim 2.1](https://www.worldclim.org/) historical averages (1970–2000) and CMIP6 projections (default **SSP2-4.5**).
+- **Crops:** [IFPRI SPAM 2010](https://doi.org/10.7910/DVN/PRFF8V) modeled harvested-area maps—not yields.
+- **Maps:** MapLibre GL with OpenFreeMap/OpenStreetMap-based services.
+
+**Important:** Climate twins do **not** account for soil, pests, water access, seed availability, costs, or local farming practices. Crop suggestions are hypotheses for **locally supervised trials**, not yield predictions or instructions to replace crops.
+
+To rebuild the atlas from source data:
+
+```bash
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python build_data.py     # about 400 MB of downloads, resumable
-.venv/bin/python evaluate.py       # re-runs the check described below
+.venv/bin/python build_data.py --models MPI-ESM1-2-HR
 ```
 
-`build_data.py --models MPI-ESM1-2-HR` uses one climate model and downloads less.
-
-The crop maps come from a host that often refuses automatic downloads. The script tries the
-original address, Harvard Dataverse and a university mirror in turn. If all fail it prints
-what to do: download `spam2010v2r0_global_harv_area.geotiff.zip` from
-https://doi.org/10.7910/DVN/PRFF8V into your Downloads folder and run the script again.
-
-To work on the interface without real data, `python make_demo_data.py` writes an invented
-dataset. The app shows a red "synthetic test data" banner while it is loaded. Do not demo or
-report anything from it.
-
-### Optional: gene bank lookup (experimental, untested against the live service)
-
-If the environment variables `GENESYS_CLIENT_ID` and `GENESYS_CLIENT_SECRET` are set before
-`app.py` starts, the "Where to look for adapted seed" card also lists gene bank samples
-(accessions) of each suggested crop collected within about 3 degrees of the top twin, from
-the Genesys PGR catalogue. Genesys issues those credentials. Without them the feature is off
-and nothing else changes. This lookup follows the request format of the genesysr R client
-and has only been tested against a local stand-in for the service.
-
-## Files
-
-| File | Purpose |
-|---|---|
-| `build_data.py` | Downloads the source maps and builds `data/atlas.npz` |
-| `twin.py` | The matching engine (`Atlas.query(lat, lon, period)`) |
-| `app.py` | Local web server and JSON API (standard library only) |
-| `static/index.html` | The map page (Leaflet) |
-| `genebank.py` | Optional Genesys gene bank lookup (off without credentials) |
-| `evaluate.py` | Checks the core assumption on today's data |
-| `make_demo_data.py` | Invented data for interface development only |
-
-## How the match works
-
-- Climate measures: average temperature, hottest-month high, coldest-month low, annual rainfall,
-  rainfall seasonality, rain in the warmest quarter, rain in the coldest quarter
-  (WorldClim BIO1, 5, 6, 12, 15, 18, 19).
-- Rainfall amounts are square-rooted, then every measure is divided by its spread across all land,
-  so each counts equally. The climate distance is the root-mean-square difference
-  (0 = identical).
-- Labels: distance up to 0.35 is a "close" match, up to 0.70 "partial", above that "poor".
-  These cut-offs are our judgement, not a published standard.
-- "Around 2040" is the average of the 2021-2040 and 2041-2060 projections. Projections are
-  averaged across the climate models downloaded. Both averages are approximations.
-
-## What we checked
-
-- **Core assumption** (`evaluate.py`): for a random sample of farmed cells we find the best
-  climate match at least 1,000 km away using today's climate for both, and measure the overlap
-  in main crops (shared top-5 crops divided by all top-5 crops in either place). The baseline is
-  a random farmed cell at least 1,000 km away.
-  Result on real data (1,500 sampled farmed cells): main-crop overlap is 29% for climate
-  matches against 15% for random farmed pairs (standard errors about 0.5 points). The
-  closer-matching half scores 35%, the looser half 24%. Crop-mix cosine similarity is 0.44
-  against 0.23. Caveat: SPAM places crops partly by climate-based suitability, so part of
-  this link is built into the crop maps.
-- **Identity test**: when the "future" is set equal to today's climate, the best match is the
-  farm's own cell at distance 0.
-- **Data build**: tested end to end on rasters written in the same file layout as the sources.
-  On the real download it found 236,742 cells with crops.
-- **Spot checks**: **TODO list two or three farms where the twin and crops look sensible, and one
-  where the tool reports no good match.**
-
-## Limits
-
-- A twin matches temperature and rainfall only. Soil, irrigation, day length, pests, markets and
-  local know-how also decide what grows. Crop lists are candidates to trial, not recommendations.
-- Irrigated farms (for example Gezira) depend less on rainfall, so rainfall-based twins fit them
-  less well. The app shows the irrigated share of cropland for the farm and each twin.
-- "Today" is the 1970-2000 average, so some warming has already happened. Crop maps are for
-  around 2010 and are themselves modelled estimates.
-- One emissions pathway (SSP2-4.5 by default) and a small set of climate models.
-- Harvested area shows what is grown, not how well it yields.
-
-## Data sources
-
-- WorldClim 2.1 baseline and CMIP6 projections, 10 arc-minutes: https://www.worldclim.org
-  (Fick & Hijmans 2017). `data/atlas.npz` is derived from it. WorldClim's terms limit
-  redistribution, so check them and remove that file before making this repository public.
-- SPAM 2010 v2.0 global harvested area, IFPRI: https://www.mapspam.info
-  (Yu et al. 2020, doi:10.7910/DVN/PRFF8V).
-- Map tiles and place names: OpenStreetMap and Nominatim.
+If the crop-map download fails, download **`spam2010v2r0_global_harv_area.geotiff.zip`** from [Harvard Dataverse](https://doi.org/10.7910/DVN/PRFF8V), place it in `~/Downloads`, and rerun the builder. Check source-data redistribution terms before publishing derived datasets.
