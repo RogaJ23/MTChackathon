@@ -3,7 +3,7 @@
 **See your farm's future climate in places already farming under similar conditions today.**
 
 *DNAForge × MTC Berkeley Hackathon 2026 · Agricultural Resilience*  
-[GitHub repository](https://github.com/RogaJ23/MTChackathon) · Team ID: **[add ID]**
+[GitHub repository](https://github.com/RogaJ23/MTChackathon) · Team ID: **[T4]**
 
 ## The problem
 
@@ -11,7 +11,7 @@ Climate forecasts tell farmers **what may change**, but not **what they could tr
 
 ## Our solution
 
-**Climate Twin** lets you choose a farm and explore how its climate could change around **2030, 2040, or 2050**, using published projections covering **2021–2060**. It finds places experiencing a similar climate **today** and shows what farmers grow there—giving local growers **ideas for small trials**, not guaranteed planting recommendations.
+**Climate Twin** lets you choose a farm and explore how its climate could change around **2030, 2040, 2050, or 2060**, using published projections covering **2021–2060**. It finds places experiencing a similar climate **today** and shows what farmers grow there—giving local growers **ideas for small trials**, not guaranteed planting recommendations.
 
 **Why it matters:** Agricultural extension officers can turn complex projections into a map, a printable handout, or a short message farmers can discuss and act on with local guidance.
 
