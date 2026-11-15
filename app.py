@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from twin import PERIOD_LABELS, VAR_INFO, Atlas
+from genebank import Genebank
 
 HERE = Path(__file__).parent
 PRESETS = [
@@ -17,6 +18,7 @@ PRESETS = [
 ]
 
 def make_handler(atlas, validation):
+    genebank = Genebank()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -42,13 +44,15 @@ def make_handler(atlas, validation):
                         "default_period": "mid" if "mid" in atlas.periods else atlas.periods[0],
                         "vars": [[v, *VAR_INFO.get(v, (v, "", 1))] for v in atlas.vars],
                         "models": atlas.models, "ssp": atlas.ssp, "synthetic": atlas.synthetic,
-                        "presets": PRESETS, "validation": validation,
+                        "presets": PRESETS, "validation": validation, "genebank": genebank.enabled,
                     })
                 elif url.path == "/api/twin":
                     res = atlas.query(float(q["lat"]), float(q["lon"]),
                                       period=q.get("period", "mid"),
                                       min_km=float(q.get("min_km", 100)))
                     self.send(200, res)
+                elif url.path == "/api/seed":
+                    self.send(200, genebank.accessions(q.get("crop", ""), float(q["lat"]), float(q["lon"])))
                 else:
                     self.send(404, {"error": "not found"})
             except (KeyError, ValueError) as e:

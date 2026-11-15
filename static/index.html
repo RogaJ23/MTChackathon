@@ -365,6 +365,7 @@ function render(res, id) {
       const link = el('a', null, 'Search the Genesys gene bank catalogue'); link.href = GENEBANK; link.target = '_blank'; link.rel = 'noopener';
       const pl = el('p', 'small'); pl.append(link, ' by crop and "Origin of material" (the twin\'s country). The printed report lists the regions for each crop.');
       sc.append(pl);
+      if (meta.genebank) for (const c of crops.slice(0, 3)) seedLookup(sc, c, id);
       out.append(sc);
     }
   }
@@ -412,6 +413,29 @@ function seedCrops(res) {
     name: c.name, isNew: res.advice.try.includes(c),
     twins: good.filter(t => t.crops.some(x => x.name === c.name)),
   })).filter(c => c.twins.length);
+}
+
+// optional: list gene bank accessions collected near a twin (only when the server has Genesys credentials)
+async function seedLookup(card, crop, id) {
+  const t = crop.twins[0];
+  const box = el('div'); box.style.marginTop = '10px';
+  const title = el('strong', null, crop.name + ' collected near '), where = el('span'); title.append(where); placeName(t.lat, t.lon, where, id);
+  const status = el('p', 'small', 'Looking up gene bank samples…');
+  box.append(title, status); card.append(box);
+  try {
+    const r = await (await fetch(`/api/seed?crop=${encodeURIComponent(crop.name)}&lat=${t.lat}&lon=${t.lon}`)).json();
+    if (id !== runId) return;
+    if (r.error || !r.items) { status.textContent = 'Gene bank lookup is unavailable right now.'; return; }
+    if (!r.items.length) { status.textContent = 'No gene bank samples recorded from this area.'; return; }
+    status.remove();
+    const ul = el('ul');
+    for (const it of r.items.slice(0, 6)) {
+      const li = el('li'), label = [it.number, it.name, it.taxon].filter(Boolean).join(' · ') + (it.institute ? ` (held by ${it.institute})` : '');
+      if (/^https:\/\//.test(it.url)) { const a = el('a', null, label); a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; li.append(a); } else li.textContent = label;
+      ul.append(li);
+    }
+    box.append(ul);
+  } catch (e) { status.textContent = 'Gene bank lookup is unavailable right now.'; }
 }
 
 function summaryText(res) {

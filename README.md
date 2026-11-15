@@ -55,6 +55,15 @@ To work on the interface without real data, `python make_demo_data.py` writes an
 dataset. The app shows a red "synthetic test data" banner while it is loaded. Do not demo or
 report anything from it.
 
+### Optional: gene bank lookup (experimental, untested against the live service)
+
+If the environment variables `GENESYS_CLIENT_ID` and `GENESYS_CLIENT_SECRET` are set before
+`app.py` starts, the "Where to look for adapted seed" card also lists gene bank samples
+(accessions) of each suggested crop collected within about 3 degrees of the top twin, from
+the Genesys PGR catalogue. Genesys issues those credentials. Without them the feature is off
+and nothing else changes. This lookup follows the request format of the genesysr R client
+and has only been tested against a local stand-in for the service.
+
 ## Files
 
 | File | Purpose |
@@ -63,6 +72,7 @@ report anything from it.
 | `twin.py` | The matching engine (`Atlas.query(lat, lon, period)`) |
 | `app.py` | Local web server and JSON API (standard library only) |
 | `static/index.html` | The map page (Leaflet) |
+| `genebank.py` | Optional Genesys gene bank lookup (off without credentials) |
 | `evaluate.py` | Checks the core assumption on today's data |
 | `make_demo_data.py` | Invented data for interface development only |
 
