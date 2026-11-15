@@ -17,7 +17,7 @@ Climate forecasts tell farmers **what may change**, but not **what they could tr
 
 ## What it does
 
-- **Choose a farm:** Click the interactive world map, search for a place, enter coordinates, or use one of eight farm-region presets.
+- **Choose a farm:** Click the interactive world map, search for a place, or enter coordinates.
 - **Select a climate forecast:** Switch between **around 2030** (2021–2040 average), **around 2040** (2021–2060 average), and **around 2050** (2041–2060 average).
 - **See what changes:** Compare today's climate with the selected future period, including projected temperature and rainfall changes and a detailed seven-variable climate table.
 - **Find climate twins:** See up to five regions where farmers already experience similar conditions, with map locations and match-quality ratings.
