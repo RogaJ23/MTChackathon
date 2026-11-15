@@ -2,7 +2,7 @@
 
 **See your farm's future climate in places already farming under similar conditions today.**
 
-<img width="400" height="240" alt="PNG image" src="https://github.com/user-attachments/assets/e5a52745-388b-465d-8e45-5b8e1f2eb2e6" />
+<img width="1512" height="947" alt="PNG image" src="https://github.com/user-attachments/assets/b3f0260a-34f4-45e5-a4f4-f132bac09c2b" />
 
 
 *DNAForge × MTC Berkeley Hackathon 2026 · Agricultural Resilience*  
